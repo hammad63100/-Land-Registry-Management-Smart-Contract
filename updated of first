@@ -1,0 +1,179 @@
+// // // SPDX-License-Identifier: MIT
+// // pragma solidity ^0.8.0;
+
+// // contract LandRecords {
+// //     struct Land {
+// //         uint256 landId;
+// //         string location;
+// //         uint256 area;
+// //         address owner;
+// //         bool isRegistered;
+        
+// //     }
+
+// //     mapping(uint256 => Land) public lands; // Land ID se Land details map karna
+// //     mapping(address => uint256[]) public ownerLands; // Malik ke address se unki lands map karna
+
+// //     event LandRegistered(uint256 landId, string location, uint256 area, address owner);
+// //     event OwnershipTransferred(uint256 landId, address previousOwner, address newOwner);
+
+// //     modifier onlyOwner(uint256 landId) {
+// //         require(lands[landId].owner == msg.sender, "Sirf malik hi ye kaam kar sakta hai");
+// //         _;
+// //     }
+
+// //     // Zameen ka record add karna
+// //     function registerLand(
+// //         uint256 landId,
+       
+// //         string memory location,
+// //         uint256 area
+// //     ) public {
+// //         require(!lands[landId].isRegistered, "Ye land pehle se registered hai");
+
+// //         lands[landId] = Land(landId, location, area, msg.sender, true);
+// //         ownerLands[msg.sender].push(landId);
+
+// //         emit LandRegistered(landId, location, area, msg.sender);
+// //     }
+
+// //     // Ownership transfer karna
+// //     function transferOwnership(uint256 landId, address newOwner) public onlyOwner(landId) {
+// //         require(newOwner != address(0), "Invalid address");
+
+// //         address previousOwner = lands[landId].owner;
+// //         lands[landId].owner = newOwner;
+
+// //         // Malik ke land records update karna
+// //         removeLandFromOwner(previousOwner, landId);
+// //         ownerLands[newOwner].push(landId);
+
+// //         emit OwnershipTransferred(landId, previousOwner, newOwner);
+// //     }
+
+// //     // Malik ka record check karna
+// //     function getLandsByOwner(address owner) public view returns (uint256[] memory) {
+// //         return ownerLands[owner];
+// //     }
+
+// //     // Zameen ka malik kaun hai?
+// //     function getLandOwner(uint256 landId) public view returns (address) {
+// //         return lands[landId].owner;
+// //     }
+
+// //     // Internal function to update owner's land list
+// //     function removeLandFromOwner(address owner, uint256 landId) internal {
+// //         uint256[] storage landsOwned = ownerLands[owner];
+// //         for (uint256 i = 0; i < landsOwned.length; i++) {
+// //             if (landsOwned[i] == landId) {
+// //                 landsOwned[i] = landsOwned[landsOwned.length - 1];
+// //                 landsOwned.pop();
+// //                 break;
+// //             }
+// //         }
+// //     }
+// // }
+
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract LandRecords {
+    struct Land {
+        uint256 landId;
+        string location;
+        uint256 area;
+        address ownerCNIC;
+        bool isRegistered;
+    }
+
+    address public admin; // Contract ka deployer (admin)
+    mapping(uint256 => Land) public lands; // Land ID se Land details map karna
+    mapping(address => uint256[]) public ownerLands; // CNIC ke address se unki lands map karna
+
+    event LandRegistered(uint256 landId, string location, uint256 area, address ownerCNIC);
+    event OwnershipTransferred(uint256 landId, address previousOwnerCNIC, address newOwnerCNIC);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Sirf admin hi ye kaam kar sakta hai");
+        _;
+    }
+
+    modifier landNotRegistered(uint256 landId) {
+        require(!lands[landId].isRegistered, "Ye land pehle se registered hai");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender; // Contract ka deployer admin ban jata hai
+    }
+
+    // Zameen ka record register karna (sirf admin kar sakta hai)
+    function registerLand(
+        uint256 landId,
+        string memory location,
+        uint256 area,
+        address ownerCNIC
+    ) public onlyAdmin landNotRegistered(landId) {
+        require(ownerCNIC != address(0), "Invalid owner CNIC");
+
+        lands[landId] = Land(landId, location, area, ownerCNIC, true);
+        ownerLands[ownerCNIC].push(landId);
+
+        emit LandRegistered(landId, location, area, ownerCNIC);
+    }
+
+    // Ownership transfer karna (sirf admin kar sakta hai)
+    function transferOwnership(uint256 landId, address newOwnerCNIC) public onlyAdmin {
+        require(newOwnerCNIC != address(0), "Invalid CNIC");
+        require(lands[landId].isRegistered, "Land registered nahi hai");
+
+        address previousOwnerCNIC = lands[landId].ownerCNIC;
+
+        // Update land owner
+        lands[landId].ownerCNIC = newOwnerCNIC;
+
+        // Purane malik ke records se land hatao
+        removeLandFromOwner(previousOwnerCNIC, landId);
+
+        // Naye malik ke records me land add karo
+        ownerLands[newOwnerCNIC].push(landId);
+
+        emit OwnershipTransferred(landId, previousOwnerCNIC, newOwnerCNIC);
+    }
+
+    // Malik ke lands ka record dekhna
+    function getLandsByOwner(address ownerCNIC) public view returns (uint256[] memory) {
+        return ownerLands[ownerCNIC];
+    }
+
+    // Zameen ka malik kaun hai?
+    function getLandOwner(uint256 landId) public view returns (address) {
+        require(lands[landId].isRegistered, "Land registered nahi hai");
+        return lands[landId].ownerCNIC;
+    }
+
+    // Ek zameen ka pura record lana
+    function getLandDetails(uint256 landId) public view returns (string memory, uint256, address) {
+        require(lands[landId].isRegistered, "Land registered nahi hai");
+
+        Land memory land = lands[landId];
+        return (land.location, land.area, land.ownerCNIC);
+    }
+
+    // Internal function to update owner's land list
+    function removeLandFromOwner(address ownerCNIC, uint256 landId) internal {
+        uint256[] storage landsOwned = ownerLands[ownerCNIC];
+        for (uint256 i = 0; i < landsOwned.length; i++) {
+            if (landsOwned[i] == landId) {
+                landsOwned[i] = landsOwned[landsOwned.length - 1];
+                landsOwned.pop();
+                break;
+            }
+        }
+    }
+}
+
+
+
+
